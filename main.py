@@ -1,8 +1,12 @@
+#!/usr/bin/env python3
+
 import subprocess
 import csv
 from tabulate import tabulate
 from io import StringIO
 import datetime
+import argparse
+import sys
 
 
 def read_beancount_ledger(file_path, start_date, end_date):
@@ -103,8 +107,19 @@ def print_comparison_report(report):
         exit(1)
 
 
-ledger_log = read_beancount_ledger('~/ledger/ledger.beancount', '2019-01-01', '2019-01-31')
-op_log = read_op_ledger('./sample_data/op_ledger.csv')
+parser = argparse.ArgumentParser(description='Compare OP and Beancount ledgers and report differences')
+parser.add_argument('beancount', type=str, nargs=1, help='Path the to OP-ledger file')
+parser.add_argument('op', type=str, nargs=1, help='Path the to OP-ledger csv')
+parser.add_argument('start', type=str, nargs=1, help='Starting date as ISO-date')
+parser.add_argument('end', type=str, nargs=1, help='Ending date as ISO-date')
+parser.add_argument('--strict', type=bool, nargs='?', default=False, help='Enable strict mode')
 
-comparison_report = compare_ledgers(op_log, ledger_log)
-print_comparison_report(comparison_report)
+if __name__ == '__main__':
+    arguments = sys.argv[1:]
+    parsed_args = parser.parse_args(arguments)
+
+    ledger_log = read_beancount_ledger(parsed_args.beancount[0], parsed_args.start[0], parsed_args.end[0])
+    op_log = read_op_ledger(parsed_args.op[0])
+
+    comparison_report = compare_ledgers(op_log, ledger_log, parsed_args.strict)
+    print_comparison_report(comparison_report)
