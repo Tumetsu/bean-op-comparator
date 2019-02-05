@@ -6,4 +6,7 @@ setup(name='op_bean_compare',
       author='Tuomas Salmi',
       license='MIT',
       packages=['op_bean_compare'],
+      install_requires=[
+          'tabulate'
+      ],
       scripts=['bin/op-bean-compare'])
