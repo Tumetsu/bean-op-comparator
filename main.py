@@ -2,6 +2,7 @@ import subprocess
 import csv
 from tabulate import tabulate
 from io import StringIO
+import datetime
 
 
 def read_beancount_ledger(file_path, start_date, end_date):
@@ -23,8 +24,9 @@ def read_op_ledger(file_path):
 
         for row in reader:
             position = float(row['Määrä\xa0 EUROA'].replace(',', '.'))
+            date = datetime.datetime.strptime(row['Kirjauspäivä'], '%d.%m.%Y')
             parsed.append({
-                'date': row['Kirjauspäivä'],
+                'date': str(date.date()),
                 'position': position,
                 'position_int': int(position * 100),
                 'narration': row['Saaja/Maksaja']
@@ -33,38 +35,47 @@ def read_op_ledger(file_path):
     return parsed
 
 
-def find_matching_entry_from(ledger, entry):
+def find_matching_entry_from(ledger, entry, strict):
     """
     Try to find a matching entry from the provided ledger. The algorithm is *really* naive. It considers any
-    transaction with same price as a match. We could improve this if we could rely on dates but the Beancount
-    ledger dates might differ from bank statement which reports all purchases as business days.
+    transaction with same price as a match. If strict mode is used, the algorithm also requires that dates
+    of the transaction match along with its position.
     :param ledger:
     :param entry:
+    :param: strict: If set true, will also require dates of the transaction to match
     :return:
     """
     for idx, row in enumerate(ledger):
-        if row['position_int'] == entry['position_int']:
+        matching_position = row['position_int'] == entry['position_int']
+
+        if strict:
+            matching_date = row['date'] == entry['date']
+            if matching_position and matching_date:
+                return row, idx
+        elif matching_position:
             return row, idx
 
     return None, None
 
 
-def compare_ledgers(authorative, target):
+def compare_ledgers(authorative, target, strict=False):
     """
     Runs a simple price based comparison between two ledgers. Source is considered as authorative ledger (for example
     a bank account report) and the target as the Beancount ledger.
 
     :param authorative:
     :param target:
+    :param strict:
     :return:
     """
     report = {
+        'strict': strict,
         'matching_transactions': [],
         'missing_transactions': []
     }
 
     for row in authorative:
-        found_row, idx = find_matching_entry_from(target, row)
+        found_row, idx = find_matching_entry_from(target, row, strict)
         row.pop('position_int')  # We do not need this key anymore so remove it from cluttering the reports etc. later
 
         if found_row is not None:
@@ -79,11 +90,15 @@ def compare_ledgers(authorative, target):
 def print_comparison_report(report):
     warning_color = '\033[93m'
     end_color = '\033[0m'
+    strict_mode = ''
+
+    if report['strict']:
+        strict_mode = 'in the strict mode'
 
     if len(report['missing_transactions']) == 0:
        exit(0)
     else:
-        print(warning_color, 'No match in ledger for transactions!\n', end_color)
+        print(warning_color, 'No matches in ledger for transactions {}!\n'.format(strict_mode), end_color)
         print(tabulate(report['missing_transactions'], headers='keys'))
         exit(1)
 
