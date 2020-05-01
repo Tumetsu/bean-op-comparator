@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import csv
 from tabulate import tabulate
 from io import StringIO
@@ -10,10 +11,14 @@ def read_beancount_ledger(file_path, start_date, end_date):
     reader = csv.DictReader(StringIO(result.stdout.decode('utf-8')))
 
     contents = [row for row in reader]
-    for row in contents:
-        row['position'] = float(row['position'].replace('EUR', '').strip())
-        row['position_int'] = int(row['position'] * 100)
-
+    try:
+        for row in contents:
+            row['position'] = float(row['position'].replace('EUR', '').strip())
+            row['position_int'] = int(row['position'] * 100)
+    except:
+        print('Failed in reading the Beancount query results')
+        print(contents)
+        sys.exit(1)
     return contents
 
 
